@@ -41,3 +41,14 @@ module.exports = { add, multiply };
 ```js
 // Uses import to import and export to export
 ```
+
+ex 1.
+import {useEffect} from "react";
+
+export default RequireAuth;
+
+ex 2.
+
+import {add, multiply} from "./math.js";
+
+export default add;
