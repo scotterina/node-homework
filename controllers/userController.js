@@ -1,31 +1,59 @@
-function register(req, res) {
-  const { name, email, password } = req.body;
-  const newUser = { name, email, password };
+const { userSchema } = require("../validation/userSchema");
+const crypto = require("crypto");
+const utils = require("util");
+const scrypt = utils.promisify(crypto.scrypt);
+
+async function register(req, res) {
+  if (!req.body) req.body = {};
+  const { error, value } = userSchema.validate(req.body, { abortEarly: false });
+  if (error) {
+    return res.status(400).json({
+      message: error.message,
+    });
+  }
+
+  const { name, email, password } = value;
+  const existingUser = global.users.find((user) => {
+    return user.email === email;
+  });
+
+  if (existingUser) {
+    return res.status(409).json({
+      message: "User already exists",
+    });
+  }
+
+  const hashedPassword = await hashPassword(value.password);
+  const newUser = { email: value.email, name: value.name, hashedPassword };
+
   global.users.push(newUser);
   global.user_id = newUser;
 
-  res.status(201).json({
+  return res.status(201).json({
     name: newUser.name,
     email: newUser.email,
   });
 }
 
-function logon(req, res) {
+async function logon(req, res) {
+  if (!req.body) req.body = {};
   const { email, password } = req.body;
-  const foundUser = global.users.find((user) => {
-    return user.email === email && user.password === password;
+  const user = global.users.find((user) => {
+    return user.email === email;
   });
 
-  if (!foundUser) {
+  const goodCredentials =
+    user && password && (await comparePassword(password, user.hashedPassword));
+  if (!goodCredentials) {
     return res.status(401).json({
       message: "Invalid email or password",
     });
   }
 
-  global.user_id = foundUser;
+  global.user_id = user;
   res.status(200).json({
-    name: foundUser.name,
-    email: foundUser.email,
+    name: user.name,
+    email: user.email,
   });
 }
 
@@ -36,4 +64,24 @@ function logoff(req, res) {
   });
 }
 
-module.exports = { register, logon, logoff };
+async function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derivedKey = await scrypt(password, salt, 64);
+  return `${salt}:${derivedKey.toString("hex")}`;
+}
+
+async function comparePassword(inputPassword, storedHash) {
+  const [salt, key] = storedHash.split(":");
+  const keyBuffer = Buffer.from(key, "hex");
+  const derivedKey = await scrypt(inputPassword, salt, 64);
+  return crypto.timingSafeEqual(keyBuffer, derivedKey);
+}
+
+module.exports = {
+  register,
+  logon,
+  logoff,
+  hashPassword,
+  comparePassword,
+  userSchema,
+};
