@@ -3,12 +3,12 @@ const taskController = require("../controllers/taskController");
 
 const router = express.Router();
 
-const { create, index, show, update, deleteTask } = taskController;
+const { create, index, show, update, deleteTask, bulkCreate } = taskController;
 
 router.post("/", create);
 router.get("/", index);
+router.post("/bulk", bulkCreate);
 router.get("/:id", show);
 router.patch("/:id", update);
 router.delete("/:id", deleteTask);
-
 module.exports = router;
