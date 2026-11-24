@@ -28,7 +28,7 @@ app.post("/testpost", (req, res) => {
 app.use("/api", timeRouter);
 app.use("/api/users", userRouter);
 app.use("/api/tasks", authMiddleware, taskRouter);
-app.use("/api/analytics", analyticsRouter);
+app.use("/api/analytics", authMiddleware, analyticsRouter);
 
 app.get("/health", async (req, res) => {
   try {

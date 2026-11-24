@@ -41,7 +41,7 @@ async function create(req, res, next) {
 }
 
 async function index(req, res, next) {
-  const query = req.query.find || "";
+  const query = req.query || {};
   const page = query.page === undefined ? 1 : Number(query.page);
   const limit = query.limit === undefined ? 10 : Number(query.limit);
 
