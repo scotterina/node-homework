@@ -19,16 +19,63 @@ async function register(req, res, next) {
   delete value.password;
 
   const { name, email, hashedPassword } = value;
-  let user = null;
-
   try {
-    user = await prisma.user.create({
-      data: { name, email, hashedPassword },
-      select: { name: true, email: true, id: true }, // specify the column values to return
+    const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { name, email, hashedPassword },
+        select: { name: true, email: true, id: true },
+      });
+
+      const welcomeTaskData = [
+        {
+          title: "Complete your profile",
+          priority: "medium",
+          userId: user.id,
+        },
+        {
+          title: "Add your first task",
+          priority: "high",
+          userId: user.id,
+        },
+        {
+          title: "Explore the app",
+          priority: "low",
+          userId: user.id,
+        },
+      ];
+
+      await tx.task.createMany({
+        data: welcomeTaskData,
+      });
+
+      const welcomeTasks = await tx.task.findMany({
+        where: {
+          userId: user.id,
+          title: {
+            in: welcomeTaskData.map((task) => task.title),
+          },
+        },
+        select: {
+          id: true,
+          title: true,
+          isCompleted: true,
+          userId: true,
+          priority: true,
+        },
+      });
+
+      return { user, welcomeTasks };
+    });
+
+    global.user_id = result.user.id;
+
+    return res.status(201).json({
+      user: result.user,
+      welcomeTasks: result.welcomeTasks,
+      transactionStatus: "success",
     });
   } catch (err) {
-    if (err.name === "PrismaClientKnownRequestError" && err.code === "P2002") {
-      // send the appropriate error back -- the email was already registered
+    if (err.code === "P2002") {
       return res.status(400).json({
         message: "User already exists",
       });
@@ -36,13 +83,6 @@ async function register(req, res, next) {
       return next(err);
     }
   }
-
-  global.user_id = user.id;
-
-  return res.status(201).json({
-    name: user.name,
-    email: user.email,
-  });
 }
 
 async function logon(req, res, next) {

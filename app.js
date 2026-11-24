@@ -5,6 +5,7 @@ const notFound = require("./middleware/not-found");
 const errorHandler = require("./middleware/error-handler");
 const authMiddleware = require("./middleware/auth");
 const taskRouter = require("./routes/taskRoutes");
+const analyticsRouter = require("./routes/analyticsRoutes");
 const app = express();
 const prisma = require("./db/prisma");
 
@@ -27,6 +28,21 @@ app.post("/testpost", (req, res) => {
 app.use("/api", timeRouter);
 app.use("/api/users", userRouter);
 app.use("/api/tasks", authMiddleware, taskRouter);
+app.use("/api/analytics", authMiddleware, analyticsRouter);
+
+app.get("/health", async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: "ok", db: "connected" });
+  } catch (err) {
+    res.status(500).json({
+      status: "error",
+      db: "not connected",
+      error: err.message,
+    });
+  }
+});
+
 app.use(notFound);
 app.use(errorHandler);
 
@@ -65,16 +81,5 @@ async function shutdown(code = 0) {
 
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
-
-app.get("/health", async (req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: "ok", db: "connected" });
-  } catch (err) {
-    res
-      .status(500)
-      .json({ status: "error", db: "not connected", error: err.message });
-  }
-});
 
 module.exports = { app, server, prisma };
